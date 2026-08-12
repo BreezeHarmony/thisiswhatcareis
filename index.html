@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ケアキャプチャ - これはケアだ！をメモしよう</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root { color-scheme: dark; }
+        }
+        .care-gradient {
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+        }
+        .dark .care-gradient {
+            background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+        }
+        .memo-card {
+            @apply bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 border-l-4 border-green-500 hover:shadow-lg transition-shadow;
+        }
+    </style>
+</head>
+<body class="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+    <div id="app"></div>
+
+    <script>
+        // ========== ストレージ管理 ==========
+        const storage = {
+            getMemos() {
+                const data = localStorage.getItem('care-memos');
+                return data ? JSON.parse(data) : [];
+            },
+            saveMemo(memo) {
+                const memos = this.getMemos();
+                memos.push(memo);
+                localStorage.setItem('care-memos', JSON.stringify(memos));
+            },
+            deleteMemo(id) {
+                const memos = this.getMemos().filter(m => m.id !== id);
+                localStorage.setItem('care-memos', JSON.stringify(memos));
+            },
+            getTheme() {
+                return localStorage.getItem('care-theme') === 'dark';
+            },
+            setTheme(isDark) {
+                localStorage.setItem('care-theme', isDark ? 'dark' : 'light');
+            }
+        };
+
+        // ========== アプリ状態 ==========
+        let state = {
+            currentTab: 'capture',
+            isDark: storage.getTheme(),
+            memos: storage.getMemos()
+        };
+
+        // ========== DOM 生成 ==========
+        function render() {
+            const app = document.getElementById('app');
+
+            if (state.isDark) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+
+            app.innerHTML = `
+                <div class="min-h-screen bg-white dark:bg-gray-900">
+                    ${renderNav()}
+                    <main class="pb-8">
+                        ${state.currentTab === 'capture' ? renderCapture() : renderDashboard()}
+                    </main>
+                    ${renderFooter()}
+                </div>
+            `;
+
+            attachEventListeners();
+        }
+
+        function renderNav() {
+            return `
+                <nav class="sticky top-0 z-50 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+                    <div class="max-w-2xl mx-auto px-4 py-4">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-heart text-green-500 text-2xl"></i>
+                                <h1 class="text-xl font-bold text-gray-900 dark:text-white">ケアキャプチャ</h1>
+                            </div>
+                            <button id="theme-btn" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                                <i class="fas fa-${state.isDark ? 'sun' : 'moon'}"></i>
+                            </button>
+                        </div>
+
+                        <div class="flex gap-2 mt-4">
+                            <button id="tab-capture" class="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                                state.currentTab === 'capture'
+                                    ? 'bg-green-500 text-white'
+                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                            }">
+                                <i class="fas fa-heart"></i> クイックメモ
+                            </button>
+                            <button id="tab-dashboard" class="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                                state.currentTab === 'dashboard'
+                                    ? 'bg-green-500 text-white'
+                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                            }">
+                                <i class="fas fa-chart-bar"></i> 記録を見る (${state.memos.length})
+                            </button>
+                        </div>
+                    </div>
+                </nav>
+            `;
+        }
+
+        function renderCapture() {
+            return `
+                <div class="min-h-[calc(100vh-200px)] care-gradient flex items-center justify-center p-4">
+                    <div class="w-full max-w-md">
+                        <div class="text-center mb-8">
+                            <div class="flex justify-center mb-4">
+                                <div class="bg-green-500 rounded-full p-4">
+                                    <i class="fas fa-heart text-white text-4xl"></i>
+                                </div>
+                            </div>
+                            <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">ケアキャプチャ</h1>
+                            <p class="text-gray-600 dark:text-gray-400">これはケアだ！とピンときたらメモしよう</p>
+                        </div>
+
+                        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">ケアの瞬間をメモ</label>
+                            <textarea id="memo-input" placeholder="例：朝、コーヒーを丁寧に淹れた時間を持てた" class="w-full h-48 p-4 border-2 border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:border-green-500 dark:focus:border-green-400 resize-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"></textarea>
+
+                            <div class="mt-4 flex gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                <span>💡 Ctrl/Cmd + Enter で送信</span>
+                            </div>
+
+                            <button id="submit-btn" class="w-full mt-6 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold py-3 px-6 rounded-lg flex items-center justify-center gap-2 transition-all duration-200">
+                                <i class="fas fa-paper-plane"></i> メモする
+                            </button>
+
+                            <div class="mt-4 p-3 bg-green-50 dark:bg-green-900/30 rounded-lg text-sm text-green-700 dark:text-green-300">
+                                ✨ あなたのケアの時間を大切に記録します
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderDashboard() {
+            const stats = getStats();
+            const filteredMemos = state.memos.sort((a, b) => b.createdAt - a.createdAt);
+
+            return `
+                <div class="min-h-[calc(100vh-200px)] bg-gray-50 dark:bg-gray-900 py-8 px-4">
+                    <div class="max-w-2xl mx-auto">
+                        <div class="mb-8">
+                            <h1 class="text-4xl font-bold text-gray-900 dark:text-white mb-2">ケア記録</h1>
+                            <p class="text-gray-600 dark:text-gray-400">あなたの大切なケアの時間を振り返ろう</p>
+                        </div>
+
+                        ${state.memos.length > 0 ? `
+                            <div class="grid grid-cols-3 gap-4 mb-8">
+                                <div class="bg-white dark:bg-gray-800 rounded-lg p-4 text-center shadow-md">
+                                    <div class="text-2xl font-bold text-green-600 dark:text-green-400">${stats.today}</div>
+                                    <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">今日のケア</div>
+                                </div>
+                                <div class="bg-white dark:bg-gray-800 rounded-lg p-4 text-center shadow-md">
+                                    <div class="text-2xl font-bold text-green-600 dark:text-green-400">${stats.week}</div>
+                                    <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">今週のケア</div>
+                                </div>
+                                <div class="bg-white dark:bg-gray-800 rounded-lg p-4 text-center shadow-md">
+                                    <div class="text-2xl font-bold text-green-600 dark:text-green-400">${stats.total}</div>
+                                    <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">全記録</div>
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        <div class="space-y-4">
+                            ${filteredMemos.length > 0 ? filteredMemos.map(memo => `
+                                <div class="memo-card">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <div class="flex-1">
+                                            <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                                                ${formatDate(memo.date)} ${memo.time}
+                                            </p>
+                                            <p class="text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words">${escapeHtml(memo.content)}</p>
+                                        </div>
+                                        <button class="delete-btn ml-2 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors" data-id="${memo.id}">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            `).join('') : `
+                                <div class="text-center py-12">
+                                    <i class="fas fa-chart-line text-gray-300 dark:text-gray-600 text-5xl mb-4"></i>
+                                    <p class="text-gray-500 dark:text-gray-400 mb-2">まだケアの記録がありません</p>
+                                    <p class="text-sm text-gray-400 dark:text-gray-500">クイックキャプチャで最初のケアをメモしましょう</p>
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderFooter() {
+            return `
+                <footer class="border-t border-gray-200 dark:border-gray-700 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                    <p>✨ あなたのケアの時間を大切に</p>
+                </footer>
+            `;
+        }
+
+        // ========== ユーティリティ ==========
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('ja-JP', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                weekday: 'short'
+            });
+        }
+
+        function getStats() {
+            const today = new Date().toISOString().split('T')[0];
+            const todayCount = state.memos.filter(m => m.date === today).length;
+
+            const weekCount = state.memos.filter(m => {
+                const date = new Date(m.date);
+                const now = new Date();
+                const diff = now.getTime() - date.getTime();
+                return diff <= 7 * 24 * 60 * 60 * 1000;
+            }).length;
+
+            return {
+                today: todayCount,
+                week: weekCount,
+                total: state.memos.length
+            };
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ========== イベントリスナー ==========
+        function attachEventListeners() {
+            // タブ切り替え
+            document.getElementById('tab-capture')?.addEventListener('click', () => {
+                state.currentTab = 'capture';
+                render();
+            });
+
+            document.getElementById('tab-dashboard')?.addEventListener('click', () => {
+                state.currentTab = 'dashboard';
+                render();
+            });
+
+            // テーマ切り替え
+            document.getElementById('theme-btn')?.addEventListener('click', () => {
+                state.isDark = !state.isDark;
+                storage.setTheme(state.isDark);
+                render();
+            });
+
+            // メモ送信
+            const memoInput = document.getElementById('memo-input');
+            const submitBtn = document.getElementById('submit-btn');
+
+            if (memoInput && submitBtn) {
+                submitBtn.addEventListener('click', addMemo);
+                memoInput.addEventListener('keydown', (e) => {
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                        addMemo();
+                    }
+                });
+            }
+
+            // メモ削除
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const id = e.currentTarget.dataset.id;
+                    if (confirm('このメモを削除しますか？')) {
+                        storage.deleteMemo(id);
+                        state.memos = storage.getMemos();
+                        render();
+                    }
+                });
+            });
+        }
+
+        function addMemo() {
+            const input = document.getElementById('memo-input');
+            if (!input || !input.value.trim()) return;
+
+            const now = new Date();
+            const memo = {
+                id: Date.now().toString(),
+                content: input.value.trim(),
+                date: now.toISOString().split('T')[0],
+                time: now.toLocaleTimeString('ja-JP', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                }),
+                createdAt: now.getTime()
+            };
+
+            storage.saveMemo(memo);
+            state.memos = storage.getMemos();
+            input.value = '';
+            render();
+            input.focus();
+        }
+
+        // ========== 初期化 ==========
+        render();
+    </script>
+</body>
+</html>
